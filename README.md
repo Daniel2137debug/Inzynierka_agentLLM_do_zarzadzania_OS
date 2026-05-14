@@ -1,0 +1,1 @@
+# Inzynierka_agnetLLM_do_zarzadzania_OS
