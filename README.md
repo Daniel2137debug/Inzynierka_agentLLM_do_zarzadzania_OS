@@ -1,1 +1,1 @@
-# Inzynierka_agnetLLM_do_zarzadzania_OS
+# Inzynierka_agentLLM_do_zarzadzania_OS
