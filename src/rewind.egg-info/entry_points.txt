@@ -1,2 +1,0 @@
-[console_scripts]
-rewind = rewind.main:app
