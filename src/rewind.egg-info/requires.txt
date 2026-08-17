@@ -1,0 +1,11 @@
+typer
+prompt_toolkit
+rich
+ollama
+pydantic>=2
+tinydb
+python-dotenv
+
+[dev]
+pytest
+pytest-mock

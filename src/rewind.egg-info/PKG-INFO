@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: rewind
+Version: 0.1.0
+Summary: Local-LLM CLI agent for Windows system file and process management, with native tool calling and journaled and reversible command execution
+Requires-Python: >=3.13
+Requires-Dist: typer
+Requires-Dist: prompt_toolkit
+Requires-Dist: rich
+Requires-Dist: ollama
+Requires-Dist: pydantic>=2
+Requires-Dist: tinydb
+Requires-Dist: python-dotenv
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-mock; extra == "dev"

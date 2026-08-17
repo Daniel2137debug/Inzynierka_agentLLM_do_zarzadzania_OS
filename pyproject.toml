@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rewind"
+version = "0.1.0"
+description = "Local-LLM console agent for Windows that turns natural-language prompts into validated, journaled and reversible system operations."
+requires-python = ">=3.13"
+dependencies = [
+
+"typer",
+"prompt_toolkit",
+"rich",
+"ollama",
+"pydantic>=2",
+"tinydb",
+"python-dotenv"
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-mock"]
+
+[project.scripts]
+rewind = "rewind.main:app"
