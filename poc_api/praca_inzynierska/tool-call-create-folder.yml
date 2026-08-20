@@ -1,0 +1,44 @@
+info:
+  name: tool-call-create-folder
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/api/chat"
+  body:
+    type: json
+    data: |-
+      {
+        "model": "{{model}}",
+        "stream": false,
+        "messages": [
+          { "role": "user", "content": "Create a folder named 'Backup' on my Desktop" }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "create_folder",
+              "description": "Create a new, empty folder at the specified absolute path.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Absolute path of the folder to create, including the new folder's own name, e.g. C:\\Users\\<username>\\Desktop\\Backup"
+                  }
+                },
+                "required": ["path"]
+              }
+            }
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

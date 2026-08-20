@@ -1,0 +1,6 @@
+name: local
+variables:
+  - name: base_url
+    value: http://localhost:11434
+  - name: model
+    value: llama3.1:8b
