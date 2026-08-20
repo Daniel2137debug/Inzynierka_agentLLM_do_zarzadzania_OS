@@ -1,6 +1,6 @@
 .venv/
 __pycache__/
-*.egg-info/ 
 #metadane, które pip install -e . wygenerował z pyproject.toml; źródłem jest toml, to jest wynik
+*.egg-info/ 
 .pytest_cache/
 .env
