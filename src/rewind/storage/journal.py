@@ -1,7 +1,8 @@
 import os
 import pathlib
 import datetime
-from tinydb import TinyDB
+from tinydb import Query, TinyDB
+from tinydb.table import Document
 
 
 
@@ -38,3 +39,20 @@ class Journal:
     def mark_failed(self, record_id: int) -> None:
         """Mark a record as failed in the journal."""
         self.db.update({"status": "failed"}, doc_ids=[record_id])
+
+    def next_to_undo(self) -> Document | None:
+        """Return the record /undo takes next: the newest success not undone yet."""
+        record = Query()
+        candidates = self.db.search((record.status == "success") & (record.undone == False))
+        if not candidates:
+            return None
+        return max(candidates, key=lambda candidate: candidate.doc_id)
+        #lambda cuz its a list so every element needs to goes through the function and the result what lambda return will be comared
+
+    def mark_undone(self, record_id: int) -> None:
+        """Flag a record as undone; the record itself stays in the journal."""
+        self.db.update({"undone": True}, doc_ids=[record_id])
+
+    def all_records(self) -> list[Document]:
+        """Return every record in the journal, oldest first."""
+        return sorted(self.db.all(), key=lambda record: record.doc_id)
