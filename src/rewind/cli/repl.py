@@ -1,7 +1,6 @@
 from rich.console import Console
-from rewind.adapter.adapter_ollama import Adapter
-from rewind.commands.create_item import CreateItemCommand
-from rewind.schemas.tools import CreateItem
+from rewind.adapter.adapter_ollama import TOOLS, Adapter
+from rewind.commands.registry import COMMANDS
 from rewind.storage.journal import Journal
 from rich.markup import escape
 from rich.table import Table
@@ -21,22 +20,24 @@ def undo_last(journal: Journal) -> None:
     done_at = record["timestamp"][:19].replace("T", " ")
     console.print(f"\n[bold yellow]undo {record['tool_name']}[/] [dim](done {done_at})[/]")
     for field, value in record["arguments"].items():
-        console.print(f"  {field}: {value}")
+        console.print(f"  {field}: {escape(str(value))}")
 
     answer = console.input("\nUndo? (y/n): ").strip().lower()
     if answer != "y":
         console.print("Undo cancelled.", style="red")
         return
 
-    
-    command = CreateItemCommand(CreateItem.model_validate(record["arguments"]))
+
+    tool_name = record["tool_name"]
+    arguments = TOOLS[tool_name].model_validate(record["arguments"])
+    command = COMMANDS[tool_name](arguments, record.doc_id, record["undo_payload"])
     success, output = command.undo()
 
     if success:
         journal.mark_undone(record.doc_id)
-        console.print(f"Undone. {output}", style="green")
+        console.print(f"Undone. {escape(output)}", style="green")
     else:
-        console.print(f"Undo refused: {output}", style="red")
+        console.print(f"Undo refused: {escape(output)}", style="red")
 
 STATUS_STYLES = {"success": "green", "failed": "red", "pending": "yellow"}
 
@@ -97,24 +98,29 @@ def run_repl(adapter: Adapter) -> None:
             show_history(journal)
             continue
 
-        with console.status("[dim]thinking...[/]", spinner="dots"):
-            result = adapter.run_conversation(user_prompt)
+        try:
+            with console.status("[dim]thinking...[/]", spinner="dots"):
+                result = adapter.run_conversation(user_prompt)
+        except ValueError as error:
+            # An unregistered tool or arguments that fail validation
+            console.print(f"The model proposed something rewind cannot run:\n{escape(str(error))}", style="red")
+            continue
         if not result:
             console.print("No response from the model.", style="red")
             continue
         if isinstance(result, str):
-            console.print(f"[bold green]Model response:[/] {result}")
+            console.print(f"[bold green]Model response:[/] {escape(result)}")
             continue
 
         for tool_name, validated in result:
             console.print(f"\n[bold yellow]{tool_name}[/]")
 
-            if tool_name != "create_item":
-                console.print(f"\n{tool_name} is not available yet - this version can only run create_item.", style="yellow")
+            if tool_name not in COMMANDS:
+                console.print(f"{tool_name} has no command behind it yet.", style="yellow")
                 continue
 
             for field, value in validated.model_dump().items():
-                console.print(f"  {field}: {value}")
+                console.print(f"  {field}: {escape(str(value))}")
 
             answer = console.input("\nExecute? (y/n): ").strip().lower()
 
@@ -124,12 +130,12 @@ def run_repl(adapter: Adapter) -> None:
 
             record_id = journal.write_pending(tool_name, validated.model_dump())
 
-            command = CreateItemCommand(validated)
+            command = COMMANDS[tool_name](validated, record_id)
             success, output = command.execute()
 
             if success:
-                journal.mark_success(record_id)
-                console.print(f"Done. {output}", style="green")
+                journal.mark_success(record_id, command.undo_payload)
+                console.print(f"Done. {escape(output)}", style="green")
             else:
                 journal.mark_failed(record_id)
-                console.print(f"Failed: {output}", style="red")
+                console.print(f"Failed: {escape(output)}", style="red")

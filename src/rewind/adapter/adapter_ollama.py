@@ -1,5 +1,5 @@
 
-from rewind.schemas.tools import RenameItem, CreateItem
+from rewind.schemas.tools import CopyItem, CreateArchive, CreateItem, DeleteItem, MoveItem, RenameItem
 from typing import Literal
 import ollama
 from rewind.environment import get_env_data
@@ -9,6 +9,10 @@ from rewind.environment import get_env_data
 TOOLS = {
     "rename_item": RenameItem,
     "create_item": CreateItem,
+    "delete_item": DeleteItem,
+    "move_item": MoveItem,
+    "copy_item": CopyItem,
+    "create_archive": CreateArchive,
 }
 
 def build_definitions() -> list[dict]:

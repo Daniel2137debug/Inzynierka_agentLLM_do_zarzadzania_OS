@@ -6,9 +6,11 @@ from pydantic import BaseModel
 class BaseCommand(ABC):
     """One operation the agent can run and take back - the Command pattern behind /undo."""
 
-    def __init__(self, arguments: BaseModel, undo_payload: dict | None = None) -> None:
+    def __init__(self, arguments: BaseModel, record_id: int, undo_payload: dict | None = None) -> None:
         self.arguments = arguments
-        # What undo() needs besides the arguments, e.g. rename's file ID. execute() fills it in.
+        
+        self.record_id = record_id
+        
         self.undo_payload = undo_payload or {}
 
     @abstractmethod

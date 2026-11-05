@@ -31,9 +31,9 @@ class Journal:
         }
         return self.db.insert(document)
 
-    def mark_success(self, record_id: int) -> None:
-        """Mark a record as successful in the journal."""
-        self.db.update({"status": "success"}, doc_ids=[record_id])  
+    def mark_success(self, record_id: int, undo_payload: dict) -> None:
+        """Mark a record as successful and store what undo() needs - the only write of the payload."""
+        self.db.update({"status": "success", "undo_payload": undo_payload}, doc_ids=[record_id]) 
 
 
     def mark_failed(self, record_id: int) -> None:
