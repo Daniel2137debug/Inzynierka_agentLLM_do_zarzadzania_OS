@@ -40,10 +40,11 @@ class Journal:
         """Mark a record as failed in the journal."""
         self.db.update({"status": "failed"}, doc_ids=[record_id])
 
-    def next_to_undo(self) -> Document | None:
-        """Return the record /undo takes next: the newest success not undone yet."""
+    def next_to_undo(self, skip_tools: set[str]) -> Document | None:
+        """Return the record /undo takes next: the newest success not undone yet, skipping irreversible tools."""
         record = Query()
-        candidates = self.db.search((record.status == "success") & (record.undone == False))
+        #one_of() is Tinydb equivalent of regular "in" operator. we added ~ to invert the condition, so finally it means "not in skip_tools" - we want to skip irreversible tools
+        candidates = self.db.search((record.status == "success") & (record.undone == False) & ~record.tool_name.one_of(skip_tools))
         if not candidates:
             return None
         return max(candidates, key=lambda candidate: candidate.doc_id)
