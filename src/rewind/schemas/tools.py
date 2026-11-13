@@ -71,3 +71,15 @@ class CreateArchive(BaseModel):
     destination: NormalizedPath = Field(
         min_length=1, description="Absolute path of the new archive, ending with .zip, e.g. C:/Users/<username>/Desktop/Photos.zip"
     )
+
+class StartProcess(BaseModel):
+    """Start a program and leave it running."""
+    program: str = Field(
+        min_length=1, description="The program to start, without any arguments: its short name, e.g. excel or charmap. Use a full path only if the user typed one; never guess a path."
+    )
+
+class StopProcess(BaseModel):
+    """Stop a running program at once. This cannot be undone: unsaved work in that program is lost."""
+    name: str = Field(
+        min_length=1, description="The name of the running program, as Task Manager shows it, without .exe - e.g. notepad or charmap"
+    )

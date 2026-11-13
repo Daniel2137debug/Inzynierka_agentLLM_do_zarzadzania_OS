@@ -1,5 +1,5 @@
 
-from rewind.schemas.tools import CopyItem, CreateArchive, CreateItem, DeleteItem, MoveItem, RenameItem
+from rewind.schemas.tools import CopyItem, CreateArchive, CreateItem, DeleteItem, MoveItem, RenameItem, StartProcess, StopProcess
 from typing import Literal
 import ollama
 from rewind.environment import get_env_data
@@ -13,6 +13,8 @@ TOOLS = {
     "move_item": MoveItem,
     "copy_item": CopyItem,
     "create_archive": CreateArchive,
+    "start_process": StartProcess,
+    "stop_process": StopProcess,
 }
 
 def build_definitions() -> list[dict]:
