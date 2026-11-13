@@ -10,7 +10,8 @@ def run_powershell(command: str) -> tuple[bool, str]:
     completed = subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
         capture_output=True,
-        text=True,
+        encoding="oem",
+        errors="replace",
     )
 
     if completed.returncode != 0:
