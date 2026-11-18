@@ -46,7 +46,14 @@ administrator:     {env["is_admin"]}
 
 Resolve locations the user names, such as "my Desktop" or "here", using the paths above. Every path you pass to a tool must be absolute. If the user names something that is not listed above, pass it through exactly as given; never invent a missing part of a path.
 """
-    
+
+#its because defaulty tools are save as ollama objects but this format cannot be saved as JSON and we need JSON format to be able to save datas in Tinydb. So this function will copy the tool calls into plain dicts and return them
+def plain_tool_calls(tool_calls: list | None) -> list[dict] | None:
+    """Copy the model's tool calls into plain dicts - ollama objects cannot be saved as JSON and must not leave adapter/."""
+    if not tool_calls:
+        return None
+    return [{"function": {"name": call.function.name, "arguments": call.function.arguments}} for call in tool_calls]
+
 
 class Adapter:
     """Start using llm model and whole conversation"""
@@ -68,12 +75,16 @@ class Adapter:
         system_prompt = build_system_prompt(env)
         self.add_message(role="system", content=system_prompt)
 
+    def restore_messages(self, messages: list[dict]) -> None:
+        """Put messages saved in an earlier run back into the conversation, after the fresh system prompt."""
+        self.conversation_history.extend(messages)
+
     def run_conversation(self, user_prompt: str | None = None) -> tuple[str, dict] | None:
         """Run the conversation with the model. If user_prompt is provided, it will be added to the conversation history. The function returns either the assistant's response or a tuple of (tool_name, tool_arguments) if a tool call is made."""
         if user_prompt:
             self.add_message(role="user", content=user_prompt)
         ollama_response = ollama.chat(model=self.model, messages=self.conversation_history, tools=build_definitions())
-        self.add_message(role="assistant", content=ollama_response.message.content, tool_calls=ollama_response.message.tool_calls)
+        self.add_message(role="assistant", content=ollama_response.message.content, tool_calls=plain_tool_calls(ollama_response.message.tool_calls))
         if not ollama_response.message.tool_calls:
             return ollama_response.message.content
         results = []

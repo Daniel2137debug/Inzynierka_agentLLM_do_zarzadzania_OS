@@ -84,10 +84,65 @@ def show_history(journal: Journal) -> None:
     console.print(table)
 
 
+# Number says how many messages of the session to show when resuming it. The newest ones are shown so the user sees the context of the last few exchanges.
+HISTORY_WINDOW = 20
+
+
+def show_sessions(sessions: list[tuple[int, str, str]]) -> None:
+    """Print sessions one per line: number, first prompt and, in small print, when the session was last active."""
+    for number, first_prompt, last_active in sessions:
+        console.print(f"  {number}  {escape(first_prompt[:60])}  [dim]{last_active[:16].replace('T', ' ')}[/]")
+
+
+def show_messages(rows: list[dict]) -> None:
+    """Print a resumed session's messages the way they looked live, each prompt with its date in small print."""
+    for row in rows:
+        message = row["message"]
+        if message["role"] == "user":
+            console.print(f"[bold cyan]>>>[/] {escape(message['content'])}")
+            console.print(f"    {row['timestamp'][:16].replace('T', ' ')}", style="dim")
+        elif "tool_calls" in message:
+            for call in message["tool_calls"]:
+                console.print(f"[bold yellow]{call['function']['name']}[/]")
+                for field, value in call["function"]["arguments"].items():
+                    console.print(f"  {field}: {escape(str(value))}")
+        elif message.get("content"):
+            console.print(f"[bold green]Model response:[/] {escape(message['content'])}")
+
+
+def choose_session(journal: Journal, adapter: Adapter) -> int:
+    """Before the REPL starts, offer the most recent sessions: a number resumes one, Enter starts a new one. Return its number."""
+    sessions = journal.list_sessions()
+    if not sessions:
+        return journal.new_session_id()
+
+    console.print("Recent sessions:", style="dim")
+    show_sessions(sessions[:3])
+    numbers = {number for number, _, _ in sessions}
+    while True:
+        answer = console.input("Session number to resume, 'more' to list all, or click Enter for a new one: ").strip().lower()
+        if not answer:
+            return journal.new_session_id()
+        if answer == "more":
+            show_sessions(sessions)
+            continue
+        # first condition check if the answer is a digit and second condition check if the number is in the list of sessions numbers bc fi 7 is a digit but it wouldnt be in the list of sessions 
+        if answer.isdigit() and int(answer) in numbers:
+            break
+        console.print(f"There is no session {escape(answer)}.", style="red")
+
+    session_id = int(answer)
+    rows = journal.last_messages(session_id, HISTORY_WINDOW)
+    show_messages(rows)
+    adapter.restore_messages([row["message"] for row in rows])
+    return session_id
+
+
 def run_repl(adapter: Adapter) -> None:
     """Read a user prompts, show the model's proposals and ask for confirmation."""
-    console.print("rewind ready - /history, /undo, /quit", style="dim")
     journal = Journal()
+    session_id = choose_session(journal, adapter)
+    console.print(f"session {session_id} - /history, /undo, /quit", style="dim")
 
     while True:
         user_prompt = console.input("[bold cyan]>>>[/] ").strip()
@@ -106,6 +161,7 @@ def run_repl(adapter: Adapter) -> None:
             show_history(journal)
             continue
 
+        history_length = len(adapter.conversation_history)
         try:
             with console.status("[dim]thinking...[/]", spinner="dots"):
                 result = adapter.run_conversation(user_prompt)
@@ -113,6 +169,13 @@ def run_repl(adapter: Adapter) -> None:
             # An unregistered tool or arguments that fail validation
             console.print(f"The model proposed something rewind cannot run:\n{escape(str(error))}", style="red")
             continue
+        finally:
+            # Save what this turn added - the prompt and the model's answer - even when the answer failed validation
+            # Before model's run we save the length of the conversation history and after model's run we save everything aboove that lenght what the raw added so users prompt and model's anwer
+            for message in adapter.conversation_history[history_length:]:
+                journal.add_message(session_id, message)
+
+
         if not result:
             console.print("No response from the model.", style="red")
             continue
@@ -139,7 +202,7 @@ def run_repl(adapter: Adapter) -> None:
                 console.print(f"Rejected {tool_name}.", style="red")
                 continue
 
-            record_id = journal.write_pending(tool_name, validated.model_dump())
+            record_id = journal.write_pending(tool_name, validated.model_dump(), session_id)
 
             command = COMMANDS[tool_name](validated, record_id)
             success, output = command.execute()
