@@ -42,11 +42,12 @@ class Journal:
         """Mark a record as failed in the journal."""
         self.db.update({"status": "failed"}, doc_ids=[record_id])
 
-    def next_to_undo(self, skip_tools: set[str]) -> Document | None:
-        """Return the record /undo takes next: the newest success not undone yet, skipping irreversible tools."""
+    def next_to_undo(self, skip_tools: set[str], session_id: int) -> Document | None:
+        """Return the record /undo takes next in this session: its newest success not undone yet, skipping irreversible tools."""
         record = Query()
         #one_of() is Tinydb equivalent of regular "in" operator. we added ~ to invert the condition, so finally it means "not in skip_tools" - we want to skip irreversible tools
-        candidates = self.db.search((record.status == "success") & (record.undone == False) & ~record.tool_name.one_of(skip_tools))
+        #& unstead of and because Tinydb uses its own Query object, so we need to use & to combine conditions
+        candidates = self.db.search((record.session_id == session_id) & (record.status == "success") & (record.undone == False) & ~record.tool_name.one_of(skip_tools))
         if not candidates:
             return None
         return max(candidates, key=lambda candidate: candidate.doc_id)
@@ -56,10 +57,15 @@ class Journal:
         """Flag a record as undone; the record itself stays in the journal."""
         self.db.update({"undone": True}, doc_ids=[record_id])
 
-    def all_records(self) -> list[Document]:
-        """Return every record in the journal, oldest first."""
-        return sorted(self.db.all(), key=lambda record: record.doc_id)
-    
+    def session_records(self, session_id: int) -> list[Document]:
+        """Return every record of one session, oldest first."""
+        return sorted(self.db.search(Query().session_id == session_id), key=lambda record: record.doc_id)
+
+    def active_records_after(self, record_id: int) -> list[Document]:
+        """Return the records newer than this one whose operations are still on disk - success, not undone - in every session."""
+        record = Query()
+        active = self.db.search((record.status == "success") & (record.undone == False))
+        return sorted([later for later in active if later.doc_id > record_id], key=lambda later: later.doc_id)
 
     def add_message(self, session_id: int, message: dict) -> None:
         """Append one message of the conversation to its session; messages are never changed afterwards."""

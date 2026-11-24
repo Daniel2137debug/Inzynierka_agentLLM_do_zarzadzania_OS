@@ -4,6 +4,7 @@ from rewind.commands.registry import COMMANDS
 from rewind.storage.journal import Journal
 from rich.markup import escape
 from rich.table import Table
+from rewind.collision import find_collision
 
 
 
@@ -12,11 +13,11 @@ console = Console()
 # Tools whose records /undo skips - irrevesible ones like StopProcess
 IRREVERSIBLE_TOOLS = {name for name, command in COMMANDS.items() if not command.can_undo}
 
-def undo_last(journal: Journal) -> None:
-    """Undo the newest successful operation from the journal, after the user confirms it."""
-    record = journal.next_to_undo(IRREVERSIBLE_TOOLS)
+def undo_last(journal: Journal, session_id: int) -> None:
+    """Undo the newest successful operation of this session, after the user confirms it."""
+    record = journal.next_to_undo(IRREVERSIBLE_TOOLS, session_id)
     if record is None:
-        console.print("Nothing to undo.", style="yellow")
+        console.print("Nothing to undo in this session.", style="yellow")
         return
 
     #that just a timestamp format
@@ -24,6 +25,11 @@ def undo_last(journal: Journal) -> None:
     console.print(f"\n[bold yellow]undo {record['tool_name']}[/] [dim](done {done_at})[/]")
     for field, value in record["arguments"].items():
         console.print(f"  {field}: {escape(str(value))}")
+
+    blocker = find_collision(record, journal.active_records_after(record.doc_id))
+    if blocker is not None:
+        console.print(f"Undo refused: record #{blocker.doc_id} ({blocker['tool_name']}, session {blocker['session_id']}) later touched the same files - undo it in session {blocker['session_id']} first.", style="red")
+        return
 
     if COMMANDS[record["tool_name"]].undo_note:
         console.print(COMMANDS[record["tool_name"]].undo_note, style="yellow")
@@ -48,15 +54,15 @@ def undo_last(journal: Journal) -> None:
 STATUS_STYLES = {"success": "green", "failed": "red", "pending": "yellow"}
 
 
-def show_history(journal: Journal) -> None:
-    """Print the journal as a table and mark the record /undo would take next."""
-    records = journal.all_records()
+def show_history(journal: Journal, session_id: int) -> None:
+    """Print this session's operations as a table and mark the record /undo would take next."""
+    records = journal.session_records(session_id)
     if not records:
-        console.print("The journal is empty.", style="dim")
+        console.print("No operations in this session yet.", style="dim")
         return
 
-    next_record = journal.next_to_undo(IRREVERSIBLE_TOOLS)
-    table = Table(title="Operation journal")
+    next_record = journal.next_to_undo(IRREVERSIBLE_TOOLS, session_id)
+    table = Table(title=f"Session {session_id} - operations")
     for column in ("#", "time", "tool", "arguments", "status", "undo"):
         table.add_column(column)
 
@@ -154,11 +160,11 @@ def run_repl(adapter: Adapter) -> None:
             break
 
         if user_prompt == "/undo":
-            undo_last(journal)
+            undo_last(journal, session_id)
             continue
 
         if user_prompt == "/history":
-            show_history(journal)
+            show_history(journal, session_id)
             continue
 
         history_length = len(adapter.conversation_history)
