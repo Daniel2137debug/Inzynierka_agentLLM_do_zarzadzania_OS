@@ -9,8 +9,8 @@ def overlaps(first: str, second: str) -> bool:
 
     if first == second:
         return True
-    elif first.startswith(second + "\\") or second.startswith(first + "\\"):
-        return True 
+    elif first.startswith(second.rstrip("\\") + "\\") or second.startswith(first.rstrip("\\") + "\\"):
+        return True
     else:
         return False
 
