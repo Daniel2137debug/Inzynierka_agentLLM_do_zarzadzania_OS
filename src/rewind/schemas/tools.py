@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, AfterValidator
 
-NormalizedPath = Annotated[str, AfterValidator(ntpath.normpath)]
+NormalizedPath = Annotated[str, AfterValidator(ntpath.abspath)]
 
 
 class CreateItem(BaseModel):
