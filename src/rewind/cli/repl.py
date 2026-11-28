@@ -5,6 +5,10 @@ from rewind.storage.journal import Journal
 from rich.markup import escape
 from rich.table import Table
 from rewind.collision import find_collision
+from rewind.executor.proxy import blocked_reason
+from rewind.environment import get_env_data
+import os
+
 
 
 
@@ -89,6 +93,24 @@ def show_history(journal: Journal, session_id: int) -> None:
 
     console.print(table)
 
+def show_status(adapter: Adapter, journal: Journal, session_id: int) -> None:
+    """Print facts about this run: the model and whether Ollama answers, the journal, the working folder, admin rights, the session."""
+    records = journal.session_records(session_id)
+    if records:
+        last = records[-1]
+        last_operation = f"#{last.doc_id} {last['tool_name']} - {'undone' if last['undone'] else last['status']}"
+    else:
+        last_operation = "none in this session yet"
+
+    answers = "Ollama answers" if adapter.is_reachable() else "[red]Ollama does not answer[/]"
+    table = Table(show_header=False, box=None)
+    table.add_row("model", f"{escape(adapter.model)} - {answers}")
+    table.add_row("journal", f"{escape(journal.path)} ({len(journal.db)} in total, {len(records)} in this session)")
+    table.add_row("working folder", f"{escape(os.getcwd())} - relative paths resolve here")
+    table.add_row("administrator", get_env_data()["is_admin"])
+    table.add_row("session", str(session_id))
+    table.add_row("last operation", last_operation)
+    console.print(table)
 
 # Number says how many messages of the session to show when resuming it. The newest ones are shown so the user sees the context of the last few exchanges.
 HISTORY_WINDOW = 20
@@ -148,7 +170,7 @@ def run_repl(adapter: Adapter) -> None:
     """Read a user prompts, show the model's proposals and ask for confirmation."""
     journal = Journal()
     session_id = choose_session(journal, adapter)
-    console.print(f"session {session_id} - /history, /undo, /quit", style="dim")
+    console.print(f"session {session_id} - /history, /undo, /status, /quit", style="dim")
 
     while True:
         user_prompt = console.input("[bold cyan]>>>[/] ").strip()
@@ -165,6 +187,10 @@ def run_repl(adapter: Adapter) -> None:
 
         if user_prompt == "/history":
             show_history(journal, session_id)
+            continue
+
+        if user_prompt == "/status":
+            show_status(adapter, journal, session_id)
             continue
 
         history_length = len(adapter.conversation_history)
@@ -198,6 +224,11 @@ def run_repl(adapter: Adapter) -> None:
 
             for field, value in validated.model_dump().items():
                 console.print(f"  {field}: {escape(str(value))}")
+
+            reason = blocked_reason(tool_name, validated.model_dump())
+            if reason is not None:
+                console.print(f"Blocked: {escape(reason)}", style="bold red")
+                continue
 
             if tool_name in IRREVERSIBLE_TOOLS:
                 console.print("This operation cannot be undone.", style="bold red")

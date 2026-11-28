@@ -35,7 +35,7 @@ def build_definitions() -> list[dict]:
 def build_system_prompt(env: dict[str,str]) -> str:
     """Set system prompt on the first position in "messages" list. It will be valid for whole conversation with user"""
     
-    return f"""You are a Windows assistant. You act by selecting one of the tools available to you. 
+    return f"""You are a Windows assistant. You can act on the computer by selecting one of the tools available to you. If the user asks a question or just talks to you, answer in plain text and call no tool; call a tool only when the user asks you to do something on the computer. 
 
 Current environment:
 home directory:    {env["home_dir"]}
@@ -78,6 +78,15 @@ class Adapter:
     def restore_messages(self, messages: list[dict]) -> None:
         """Put messages saved in an earlier run back into the conversation, after the fresh system prompt."""
         self.conversation_history.extend(messages)
+
+    def is_reachable(self) -> bool:
+        """Tell whether the Ollama server answers; a server that is not running is the usual reason the model stays silent."""
+        try:
+            #normally ollama.list() returns a list of models, but if the server is not running it raises ConnectionError. Here is just the easiest way to check if the server is running, we don't need the list of models here.
+            ollama.list()
+        except (ConnectionError, ollama.ResponseError):
+            return False
+        return True
 
     def run_conversation(self, user_prompt: str | None = None) -> tuple[str, dict] | None:
         """Run the conversation with the model. If user_prompt is provided, it will be added to the conversation history. The function returns either the assistant's response or a tuple of (tool_name, tool_arguments) if a tool call is made."""

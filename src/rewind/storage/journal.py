@@ -14,7 +14,8 @@ class Journal:
             localisation = os.path.join(os.getenv("LOCALAPPDATA"), "rewind")
             pathlib.Path(localisation).mkdir(parents=True, exist_ok=True) 
             cls._instance = super(Journal, cls).__new__(cls)
-            cls._instance.db = TinyDB(os.path.join(localisation, "journal.json"))
+            cls._instance.path = os.path.join(localisation, "journal.json")
+            cls._instance.db = TinyDB(cls._instance.path)
             cls._instance.messages = cls._instance.db.table("messages")
       
         return cls._instance
